@@ -1,0 +1,9 @@
+onts/uberon.owl
+onts/pato.owl
+onts/obi.owl
+onts/go.owl
+onts/chebi.owl
+onts/po.owl
+onts/bfo.owl
+onts/doid.owl
+onts/ro.owl
