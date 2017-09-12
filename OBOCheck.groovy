@@ -25,11 +25,15 @@ import org.semanticweb.owlapi.reasoner.structural.*
 import com.clarkparsia.owlapi.explanation.*
 import com.clarkparsia.owlapi.explanation.util.*
 
+PrintWriter fout = new PrintWriter(new BufferedWriter(new FileWriter("imports.txt")))
 OWLOntologyManager manager = OWLManager.createOWLOntologyManager()
 def ontset = new TreeSet()
 new File("onts/").eachFile { f ->
+  fout.println(f)
   ontset.add(manager.loadOntologyFromOntologyDocument(f))
 }
+fout.flush()
+fout.close()
 
 OWLOntology ont = manager.createOntology(IRI.create("http://bio2vec.net/test-obo.owl"), ontset)
 
@@ -43,6 +47,14 @@ reasoner.precomputeInferences(InferenceType.CLASS_HIERARCHY)
 def bb = new BlackBoxExplanation(ont, f1, reasoner)
 ExplanationGenerator expl = new HSTExplanationGenerator(bb)
 
+fout = new PrintWriter(new BufferedWriter(new FileWriter("incoherent.txt")))
+reasoner.getEquivalentClasses(fac.getOWLNothing()).each { cl ->
+  fout.println(cl.toString())
+}
+fout.flush()
+fout.close()
+
+// counting
 def map = [:].withDefault { 0 }
 reasoner.getEquivalentClasses(fac.getOWLNothing()).each { cl ->
   println "Generating explanations for $cl"
@@ -50,7 +62,7 @@ reasoner.getEquivalentClasses(fac.getOWLNothing()).each { cl ->
     map[ax] += 1
   }
 }
-PrintWriter fout = new PrintWriter(new BufferedWriter(new FileWriter("expl.txt")))
+fout = new PrintWriter(new BufferedWriter(new FileWriter("explanations.txt")))
 map.each { ax, count ->
   fout.println("$ax\t$count")
 }
