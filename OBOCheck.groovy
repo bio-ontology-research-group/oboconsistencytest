@@ -24,18 +24,23 @@ import org.semanticweb.owlapi.manchestersyntax.renderer.*;
 import org.semanticweb.owlapi.reasoner.structural.*
 import com.clarkparsia.owlapi.explanation.*
 import com.clarkparsia.owlapi.explanation.util.*
+import org.semanticweb.owlapi.manchestersyntax.renderer.*
 
-PrintWriter fout = new PrintWriter(new BufferedWriter(new FileWriter("imports.txt")))
+PrintWriter fout = new PrintWriter(new BufferedWriter(new FileWriter("explanations-full.txt")))
 OWLOntologyManager manager = OWLManager.createOWLOntologyManager()
 def ontset = new TreeSet()
+fout.println("Loading ontologies and generating imports closure")
 new File("onts/").eachFile { f ->
-  fout.println(f)
-  ontset.add(manager.loadOntologyFromOntologyDocument(f))
+  //  fout.println(f)
+  def o = manager.loadOntologyFromOntologyDocument(f)
+  ontset.add(o)
+  fout.println("Imports closure of $f: "+manager.getImportsClosure(o).collect { it.getOntologyID() })
 }
-fout.flush()
-fout.close()
+//fout.flush()
+//fout.close()
 
 OWLOntology ont = manager.createOntology(IRI.create("http://bio2vec.net/test-obo.owl"), ontset)
+
 
 OWLDataFactory fac = manager.getOWLDataFactory()
 ConsoleProgressMonitor progressMonitor = new ConsoleProgressMonitor()
@@ -47,21 +52,56 @@ reasoner.precomputeInferences(InferenceType.CLASS_HIERARCHY)
 def bb = new BlackBoxExplanation(ont, f1, reasoner)
 ExplanationGenerator expl = new HSTExplanationGenerator(bb)
 
+/*
 fout = new PrintWriter(new BufferedWriter(new FileWriter("incoherent.txt")))
 reasoner.getEquivalentClasses(fac.getOWLNothing()).each { cl ->
-  fout.println(cl.toString())
+  def label = null
+  EntitySearcher.getAnnotations(cl, ont, fac.getRDFSLabel()).each { a ->
+    OWLAnnotationValue val = a.getValue()
+    if (val instanceof OWLLiteral) {
+      label = val.getLiteral()
+    }
+  }
+  fout.println(label + " ("+cl.toString()+")")
 }
 fout.flush()
 fout.close()
+*/
 
+//fout = new PrintWriter(new BufferedWriter(new FileWriter("explanations-full.txt")))
+fout.println("\n\nGenerating explanations for unsatisfiable classes:\n")
 // counting
 def map = [:].withDefault { 0 }
 reasoner.getEquivalentClasses(fac.getOWLNothing()).each { cl ->
-  println "Generating explanations for $cl"
+  def label = null
+  EntitySearcher.getAnnotations(cl, ont, fac.getRDFSLabel()).each { a ->
+    OWLAnnotationValue val = a.getValue()
+    if (val instanceof OWLLiteral) {
+      label = val.getLiteral()
+    }
+  }
+  println "Generating explanations for $label ($cl)"
+  fout.println("Explanation for incoherence of $label ($cl): ")
+  ManchesterOWLSyntaxOWLObjectRendererImpl rendering = new ManchesterOWLSyntaxOWLObjectRendererImpl()
+  rendering.setShortFormProvider(new AnnotationValueShortFormProvider(
+				   [ fac.getRDFSLabel() ], Collections.<OWLAnnotationProperty, List<String>>emptyMap(), manager))
   expl.getExplanation(cl).each { ax ->
     map[ax] += 1
+    def l = []
+    ontset.each {
+      if (EntitySearcher.containsAxiom(ax, it, true)) {
+	l << it.getOntologyID()
+      }
+    }
+    fout.println("\t"+rendering.render(ax))
+    fout.println("\t\t\t$ax")
+    fout.println("\t\t\tasserted in $l")
   }
+  fout.println("q.e.d.")
+  fout.println("\n\n")
 }
+fout.flush()
+fout.close()
 fout = new PrintWriter(new BufferedWriter(new FileWriter("explanations.txt")))
 map.each { ax, count ->
   fout.println("$ax\t$count")
